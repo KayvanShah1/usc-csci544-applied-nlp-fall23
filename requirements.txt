@@ -1,0 +1,6 @@
+contractions
+nltk
+numpy
+pandas
+scipy
+scikit-learn
