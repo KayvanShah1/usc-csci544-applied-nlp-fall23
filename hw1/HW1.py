@@ -33,6 +33,7 @@ from sklearn.naive_bayes import MultinomialNB
 
 class Config:
     RANDOM_STATE = 56
+    # Place the downloaded Dataset at the same level as this python file
     DATA_PATH = "amazon_reviews_us_Office_Products_v1_00.tsv.gz"
     TEST_SPLIT = 0.2
     N_SAMPLES_EACH_CLASS = 50000
@@ -81,6 +82,18 @@ class DataProcessor:
 
         sampled_df.drop(columns=["star_rating"], inplace=True)
         return sampled_df
+
+    @staticmethod
+    def basic_process_data(df):
+        df = DataProcessor.filter_columns(df)
+        df = DataProcessor.convert_star_rating(df)
+        df = DataProcessor.classify_sentiment(df)
+
+        df = DataProcessor.sample_data(df, Config.N_SAMPLES_EACH_CLASS, Config.RANDOM_STATE)
+
+        # For consistency along the column, convert dtype the review_body to str
+        df["review_body"] = df["review_body"].astype(str)
+        return df
 
 
 class TextCleaner:
@@ -185,16 +198,11 @@ preprocess_text_vect = np.vectorize(TextPreprocessor.preprocess_text)
 
 
 def clean_and_process_data(path):
+    # Place the downloaded Dataset at the same level as this python file
     df = DataLoader.load_data(path)
-    df_filtered = DataProcessor.filter_columns(df)
-    df_filtered = DataProcessor.convert_star_rating(df_filtered)
-    df_filtered = DataProcessor.classify_sentiment(df_filtered)
 
-    balanced_df = DataProcessor.sample_data(
-        df_filtered, Config.N_SAMPLES_EACH_CLASS, Config.RANDOM_STATE
-    )
-
-    balanced_df["review_body"] = balanced_df["review_body"].astype(str)
+    # Do the basic processing of the dataset
+    balanced_df = DataProcessor.basic_process_data(df)
 
     # Clean data
     avg_len_before_clean = balanced_df["review_body"].apply(len).mean()
