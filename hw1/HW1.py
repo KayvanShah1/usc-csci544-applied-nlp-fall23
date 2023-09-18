@@ -11,13 +11,14 @@ import numpy as np
 import pandas as pd
 
 import nltk
-from nltk.corpus import stopwords
+from nltk.corpus import stopwords, wordnet
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 
 nltk.download("punkt", quiet=True)
 nltk.download("wordnet", quiet=True)
 nltk.download("stopwords", quiet=True)
+nltk.download("averaged_perceptron_tagger", quiet=True)
 
 import contractions
 
@@ -37,6 +38,49 @@ class Config:
     N_SAMPLES_EACH_CLASS = 50000
     NUM_TFIDF_FEATURES = 5000
     NUM_BOW_FEATURES = 5000
+
+
+class DataLoader:
+    @staticmethod
+    def load_data(path):
+        df = pd.read_csv(
+            path,
+            sep="\t",
+            usecols=["review_headline", "review_body", "star_rating"],
+            on_bad_lines="skip",
+            memory_map=True,
+        )
+        return df
+
+
+class DataProcessor:
+    @staticmethod
+    def filter_columns(df):
+        return df.loc[:, ["review_body", "star_rating"]]
+
+    @staticmethod
+    def convert_star_rating(df):
+        df["star_rating"] = pd.to_numeric(df["star_rating"], errors="coerce")
+        df.dropna(subset=["star_rating"], inplace=True)
+        return df
+
+    @staticmethod
+    def classify_sentiment(df):
+        df["sentiment"] = df["star_rating"].apply(lambda x: 1 if x <= 3 else 2)
+        return df
+
+    @staticmethod
+    def sample_data(df, n_samples, random_state):
+        sampled_df = pd.concat(
+            [
+                df.query("sentiment==1").sample(n=n_samples, random_state=random_state),
+                df.query("sentiment==2").sample(n=n_samples, random_state=random_state),
+            ],
+            ignore_index=True,
+        ).sample(frac=1, random_state=random_state)
+
+        sampled_df.drop(columns=["star_rating"], inplace=True)
+        return sampled_df
 
 
 class TextCleaner:
@@ -85,6 +129,8 @@ class TextCleaner:
 
 
 class TextPreprocessor:
+    lemmatizer = WordNetLemmatizer()
+
     @staticmethod
     def get_stopwords_pattern():
         # Stopword list
@@ -97,65 +143,45 @@ class TextPreprocessor:
         return pattern
 
     @staticmethod
-    def lemmatize_text(text):
-        lemmatizer = WordNetLemmatizer()
-        words = word_tokenize(text)
-        lemmatized_words = [lemmatizer.lemmatize(word) for word in words]
+    def pos_tagger(tag):
+        if tag.startswith("J"):
+            return wordnet.ADJ
+        elif tag.startswith("V"):
+            return wordnet.VERB
+        elif tag.startswith("N"):
+            return wordnet.NOUN
+        elif tag.startswith("R"):
+            return wordnet.ADV
+        else:
+            return None
+
+    @staticmethod
+    def lemmatize_text_using_pos_tags(text):
+        words = nltk.pos_tag(word_tokenize(text))
+        words = map(lambda x: (x[0], TextPreprocessor.pos_tagger(x[1])), words)
+        lemmatized_words = [
+            TextPreprocessor.lemmatizer.lemmatize(word, tag) if tag else word for word, tag in words
+        ]
         return " ".join(lemmatized_words)
+
+    @staticmethod
+    def lemmatize_text(text):
+        words = word_tokenize(text)
+        lemmatized_words = [TextPreprocessor.lemmatizer.lemmatize(word) for word in words]
+        return " ".join(lemmatized_words)
+
+    pattern = get_stopwords_pattern()
 
     @staticmethod
     def preprocess_text(text):
         # replacing all the stopwords
-        text = TextPreprocessor.get_stopwords_pattern().sub("", text)
+        text = TextPreprocessor.pattern.sub("", text)
         text = TextPreprocessor.lemmatize_text(text)
         return text
 
 
 clean_text_vect = np.vectorize(TextCleaner.clean_text)
 preprocess_text_vect = np.vectorize(TextPreprocessor.preprocess_text)
-
-
-class DataLoader:
-    @staticmethod
-    def load_data(path):
-        df = pd.read_csv(
-            path,
-            sep="\t",
-            usecols=["review_headline", "review_body", "star_rating"],
-            on_bad_lines="skip",
-            memory_map=True,
-        )
-        return df
-
-
-class DataProcessor:
-    @staticmethod
-    def filter_columns(df):
-        return df.loc[:, ["review_body", "star_rating"]]
-
-    @staticmethod
-    def convert_star_rating(df):
-        df["star_rating"] = pd.to_numeric(df["star_rating"], errors="coerce")
-        df.dropna(subset=["star_rating"], inplace=True)
-        return df
-
-    @staticmethod
-    def classify_sentiment(df):
-        df["sentiment"] = df["star_rating"].apply(lambda x: 1 if x <= 3 else 2)
-        return df
-
-    @staticmethod
-    def sample_data(df, n_samples, random_state):
-        sampled_df = pd.concat(
-            [
-                df.query("sentiment==1").sample(n=n_samples, random_state=random_state),
-                df.query("sentiment==2").sample(n=n_samples, random_state=random_state),
-            ],
-            ignore_index=True,
-        ).sample(frac=1, random_state=random_state)
-
-        sampled_df.drop(columns=["star_rating"], inplace=True)
-        return sampled_df
 
 
 def clean_and_process_data(path):
@@ -173,6 +199,8 @@ def clean_and_process_data(path):
     # Clean data
     avg_len_before_clean = balanced_df["review_body"].apply(len).mean()
     balanced_df["review_body"] = balanced_df["review_body"].apply(clean_text_vect)
+    # Drop reviews that are empty
+    balanced_df = balanced_df.loc[balanced_df["review_body"].str.strip() != ""]
     avg_len_after_clean = balanced_df["review_body"].apply(len).mean()
 
     # Preprocess data
@@ -199,54 +227,16 @@ def evaluate_model(model, X_test, y_test):
     return precision, recall, f1
 
 
-def train_evaluate_perceptron(X_train, y_train, X_test, y_test):
-    # Initialize Perceptron model
-    perceptron = Perceptron(max_iter=4000)
+def train_and_evaluate_model(model_class, X_train, y_train, X_test, y_test, **model_params):
+    # Initialize model
+    model = model_class(**model_params)
 
     # Train the model
-    perceptron.fit(X_train, y_train)
+    model.fit(X_train, y_train)
 
     # Evaluate model
-    precision, recall, f1 = evaluate_model(perceptron, X_test, y_test)
-    return precision, recall, f1
-
-
-def train_evaluate_svm(X_train, y_train, X_test, y_test):
-    # Initialize SVM model
-    svm = LinearSVC(max_iter=2500)
-
-    # Train the model
-    svm.fit(X_train, y_train)
-
-    # Evaluate model
-    precision, recall, f1 = evaluate_model(svm, X_test, y_test)
-    return precision, recall, f1
-
-
-def train_evaluate_logistic_regression(X_train, y_train, X_test, y_test):
-    # Initialize Logistic Regression model
-    log_reg = LogisticRegression(max_iter=4000)
-
-    # Train the model
-    log_reg.fit(X_train, y_train)
-
-    # Evaluate model
-    precision, recall, f1 = evaluate_model(log_reg, X_test, y_test)
-
-    return precision, recall, f1
-
-
-def train_evaluate_naive_bayes(X_train, y_train, X_test, y_test):
-    # Initialize Naive Bayes model (Multinomial Naive Bayes for text classification)
-    nb_model = MultinomialNB()
-
-    # Train the model
-    nb_model.fit(X_train, y_train)
-
-    # Evaluate model
-    precision, recall, f1 = evaluate_model(nb_model, X_test, y_test)
-
-    return precision, recall, f1
+    precision, recall, f1 = evaluate_model(model, X_test, y_test)
+    return model, precision, recall, f1
 
 
 def main():
@@ -270,16 +260,54 @@ def main():
     X_test_bow = count_vectorizer.transform(X_test)
 
     # Train and evaluate Perceptron model using BoW features
-    precision_perceptron_bow, recall_perceptron_bow, f1_perceptron_bow = train_evaluate_perceptron(
-        X_train_bow, y_train, X_test_bow, y_test
+    (
+        _,
+        precision_perceptron_bow,
+        recall_perceptron_bow,
+        f1_perceptron_bow,
+    ) = train_and_evaluate_model(
+        Perceptron, X_train_bow, y_train, X_test_bow, y_test, max_iter=4000
     )
 
     # Train and evaluate Perceptron model using TF-IDF features
     (
+        _,
         precision_perceptron_tfidf,
         recall_perceptron_tfidf,
         f1_perceptron_tfidf,
-    ) = train_evaluate_perceptron(X_train_tfidf, y_train, X_test_tfidf, y_test)
+    ) = train_and_evaluate_model(
+        Perceptron, X_train_tfidf, y_train, X_test_tfidf, y_test, max_iter=4000
+    )
+
+    # Train and evaluate SVM model using BoW features
+    _, precision_svm_bow, recall_svm_bow, f1_svm_bow = train_and_evaluate_model(
+        LinearSVC, X_train_bow, y_train, X_test_bow, y_test, max_iter=2500
+    )
+
+    # Train and evaluate SVM model using TF-IDF features
+    _, precision_svm_tfidf, recall_svm_tfidf, f1_svm_tfidf = train_and_evaluate_model(
+        LinearSVC, X_train_tfidf, y_train, X_test_tfidf, y_test, max_iter=2500
+    )
+
+    # Train and evaluate Logistic Regression model using BoW features
+    _, precision_lr_bow, recall_lr_bow, f1_lr_bow = train_and_evaluate_model(
+        LogisticRegression, X_train_bow, y_train, X_test_bow, y_test, max_iter=4000
+    )
+
+    # Train and evaluate Logistic Regression model using TF-IDF features
+    _, precision_lr_tfidf, recall_lr_tfidf, f1_lr_tfidf = train_and_evaluate_model(
+        LogisticRegression, X_train_tfidf, y_train, X_test_tfidf, y_test, max_iter=4000
+    )
+
+    # Train and evaluate Naive Bayes model using BoW features
+    _, precision_nb_bow, recall_nb_bow, f1_nb_bow = train_and_evaluate_model(
+        MultinomialNB, X_train_bow, y_train, X_test_bow, y_test
+    )
+
+    # Train and evaluate Naive Bayes model using TF-IDF features
+    _, precision_nb_tfidf, recall_nb_tfidf, f1_nb_tfidf = train_and_evaluate_model(
+        MultinomialNB, X_train_tfidf, y_train, X_test_tfidf, y_test
+    )
 
     # Print the results
     print(f"{precision_perceptron_bow:.4f} {recall_perceptron_bow:.4f} {f1_perceptron_bow:.4f}")
@@ -287,45 +315,12 @@ def main():
         f"{precision_perceptron_tfidf:.4f} {recall_perceptron_tfidf:.4f} {f1_perceptron_tfidf:.4f}"
     )
 
-    # Train and evaluate SVM model using BoW features
-    precision_svm_bow, recall_svm_bow, f1_svm_bow = train_evaluate_svm(
-        X_train_bow, y_train, X_test_bow, y_test
-    )
-
-    # Train and evaluate SVM model using TF-IDF features
-    precision_svm_tfidf, recall_svm_tfidf, f1_svm_tfidf = train_evaluate_svm(
-        X_train_tfidf, y_train, X_test_tfidf, y_test
-    )
-
-    # Print the results
     print(f"{precision_svm_bow:.4f} {recall_svm_bow:.4f} {f1_svm_bow:.4f}")
     print(f"{precision_svm_tfidf:.4f} {recall_svm_tfidf:.4f} {f1_svm_tfidf:.4f}")
 
-    # Train and evaluate Logistic Regression model using BoW features
-    precision_lr_bow, recall_lr_bow, f1_lr_bow = train_evaluate_logistic_regression(
-        X_train_bow, y_train, X_test_bow, y_test
-    )
-
-    # Train and evaluate Logistic Regression model using TF-IDF features
-    precision_lr_tfidf, recall_lr_tfidf, f1_lr_tfidf = train_evaluate_logistic_regression(
-        X_train_tfidf, y_train, X_test_tfidf, y_test
-    )
-
-    # Print the results
     print(f"{precision_lr_bow:.4f} {recall_lr_bow:.4f} {f1_lr_bow:.4f}")
     print(f"{precision_lr_tfidf:.4f} {recall_lr_tfidf:.4f} {f1_lr_tfidf:.4f}")
 
-    # Train and evaluate Naive Bayes model using BoW features
-    precision_nb_bow, recall_nb_bow, f1_nb_bow = train_evaluate_naive_bayes(
-        X_train_bow, y_train, X_test_bow, y_test
-    )
-
-    # Train and evaluate Naive Bayes model using TF-IDF features
-    precision_nb_tfidf, recall_nb_tfidf, f1_nb_tfidf = train_evaluate_naive_bayes(
-        X_train_tfidf, y_train, X_test_tfidf, y_test
-    )
-
-    # Print the results
     print(f"{precision_nb_bow:.4f} {recall_nb_bow:.4f} {f1_nb_bow:.4f}")
     print(f"{precision_nb_tfidf:.4f} {recall_nb_tfidf:.4f} {f1_nb_tfidf:.4f}")
 
