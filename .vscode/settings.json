@@ -7,4 +7,7 @@
         "--line-length=100"
     ],
     "black-formatter.importStrategy": "useBundled",
+    "editor.formatOnSave": true,
+    "notebook.formatOnSave.enabled": false,
+    "notebook.consolidatedRunButton": false
 }
