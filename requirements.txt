@@ -1,4 +1,6 @@
+black
 contractions
+flake8
 nltk
 numpy
 pandas
