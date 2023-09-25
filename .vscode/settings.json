@@ -2,5 +2,9 @@
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter"
     },
-    "python.formatting.provider": "none"
+    "black-formatter.args": [
+        "--preview",
+        "--line-length=100"
+    ],
+    "black-formatter.importStrategy": "useBundled",
 }
