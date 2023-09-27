@@ -13,9 +13,9 @@ import pandas as pd
 
 class PathConfig:
     HW2_DIR = os.path.dirname(os.getcwd())
-    OUTPUT_DIR = os.path.join(HW2_DIR, "solution", "output")
+    OUTPUT_DIR = os.path.join(HW2_DIR, "output")
 
-    DATA_PATH = os.path.join(HW2_DIR, "CSCI544_HW2", "data")
+    DATA_PATH = os.path.join(HW2_DIR, "data")
     VERIFICATION_DATA_PATH = os.path.join(HW2_DIR, "CSCI544_HW2", "verification")
 
     VOCAB_FILE_PATH = os.path.join(OUTPUT_DIR, "vocab.txt")
