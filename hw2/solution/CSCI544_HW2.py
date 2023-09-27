@@ -179,11 +179,11 @@ class VocabularyGenerator:
 
 class HMM:
     def __init__(self, vocab_file: str, labels: List[str]):
-        """_summary_
+        """Initialize the HMM model
 
         Args:
-            train_data (pd.DataFrame): _description_
-            vocab_file (str): _description_
+            vocab_file (str): Path to the vocab file
+            labels (List[str): List of tags
         """
         self.vocab = self._read_vocab(vocab_file)
         self.labels = labels
@@ -222,6 +222,10 @@ class HMM:
         return np.where(prob_mat == 0, smoothing_constant, prob_mat)
 
     def _compute_prior_params(self, train_data):
+        """Compute the prior probabilities
+
+        Formula: π(s) = count(null -> s) / count(num_sentences)
+        """
         tag_to_index = {tag: i for i, tag in enumerate(self.labels)}
         num_sentences = len(train_data)
 
@@ -234,6 +238,10 @@ class HMM:
         self.priors = self._smoothen_propabilities(self.priors, self.smoothing_constant)
 
     def _compute_transition_params(self, train_data):
+        """Compute transition parameters
+
+        Formula: t(s′|s) = count(s -> s′) / count(s)
+        """
         tag_to_index = {tag: i for i, tag in enumerate(self.labels)}
 
         for sentence in train_data:
@@ -249,6 +257,10 @@ class HMM:
         self.transitions = self._smoothen_propabilities(self.transitions, self.smoothing_constant)
 
     def _compute_emission_params(self, train_data):
+        """Compute emission parameters
+
+        Formula: e(x|s) = count(s -> x) / count(s)
+        """
         word_to_index = dict(zip(self.vocab["word"], self.vocab["index"]))
         tag_to_index = {tag: i for i, tag in enumerate(self.labels)}
 
@@ -413,7 +425,7 @@ def calculate_accuracy(predicted_sequences, true_sequences):
         true_sequences (list): List of true sequences.
 
     Returns:
-        float: Accuracy as a percentage.
+        float: Accuracy.
     """
     total = 0
     correct = 0
@@ -429,6 +441,7 @@ def calculate_accuracy(predicted_sequences, true_sequences):
 
 
 def train_and_evaluate():
+    # Prepare dataset
     train_dataset = WSJDataset(path=WSJDatasetConfig.train_file_path)
     df_train = train_dataset.prepare_dataset()
 
@@ -440,6 +453,7 @@ def train_and_evaluate():
     test_dataset = WSJDataset(path=WSJDatasetConfig.test_file_path)
     test_dataset.prepare_dataset()
 
+    # Generate vocabulary
     vocab_generator = VocabularyGenerator(
         threshold=VocabConfig.THRESHOLD, unknown_token=VocabConfig.UNKNOWN_TOKEN, save=True
     )
@@ -451,17 +465,21 @@ def train_and_evaluate():
         int(vocab_df[vocab_df["word"] == "<unk>"].frequency),
     )
 
+    # Extract unique part-of-speech tags
     unique_pos_tags = df_train.labels.explode().unique()
     unique_pos_tags = unique_pos_tags.tolist()
 
+    # Preprocess Data for training and evaluation
     train_sentences_with_pos_tags = train_dataset.get_sentences_with_pos_tags()
     valid_sentences_with_pos_tags = valid_dataset.get_sentences_with_pos_tags()
     test_sentences_with_pos_tags = test_dataset.get_sentences_with_pos_tags()
 
+    # Initialize, train, and save the model
     model = HMM(vocab_file=VocabConfig.VOCAB_FILE, labels=unique_pos_tags)
     model.fit(train_sentences_with_pos_tags)
     model.save_model()
 
+    # Get all the parameters as probability matrices
     p, t, e = model.get_all_probability_matrices
     print("Number of Transition Parameters =", len(t.flatten()))
     print("Number of Emission Parameters =", len(e.flatten()))
@@ -486,7 +504,7 @@ def train_and_evaluate():
     # Assuming you have the probability matrices and other data
     viterbi_decoder = ViterbiDecoding(p, t, e, model.states, model.vocab)
 
-    # Apply Greedy Decoding on development data
+    # Apply Viterbi Decoding on development data
     predicted_dev_tags_viterbi = viterbi_decoder.decode(valid_sentences_with_pos_tags)
 
     acc_v = calculate_accuracy(predicted_dev_tags_viterbi, df_valid.labels.tolist())
