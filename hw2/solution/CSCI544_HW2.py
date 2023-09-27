@@ -1,10 +1,10 @@
+import itertools
 import json
 import os
 import warnings
 
 warnings.filterwarnings("ignore")
 
-from collections import Counter
 from typing import List
 
 import numpy as np
@@ -20,11 +20,21 @@ class PathConfig:
 
     VOCAB_FILE_PATH = os.path.join(OUTPUT_DIR, "vocab.txt")
     HMM_MODEL_SAVE_PATH = os.path.join(OUTPUT_DIR, "hmm.json")
+    GREEDY_ALGO_OUTPUT_PATH = os.path.join(OUTPUT_DIR, "greedy.json")
+    VITERBI_ALGO_OUTPUT_PATH = os.path.join(OUTPUT_DIR, "viterbi.json")
+
+
+class WSJDatasetConfig:
+    cols = ["index", "sentences", "labels"]
+
+    train_file_path = os.path.join(PathConfig.DATA_PATH, "train.json")
+    dev_file_path = os.path.join(PathConfig.DATA_PATH, "dev.json")
+    test_file_path = os.path.join(PathConfig.DATA_PATH, "test.json")
 
 
 class VocabConfig:
     UNKNOWN_TOKEN = "<unk>"
-    THRESHOLD = 3
+    THRESHOLD = 2
     FILE_HEADER = ["word", "index", "frequency"]
 
     VOCAB_FILE = PathConfig.VOCAB_FILE_PATH
@@ -32,6 +42,41 @@ class VocabConfig:
 
 class HMMConfig:
     HMM_MODEL_SAVED = PathConfig.HMM_MODEL_SAVE_PATH
+
+
+class WSJDataset:
+    def __init__(self, path, split="train"):
+        self.path = path
+        self.split = split
+
+        self.data: pd.DataFrame = None
+        self.cols = WSJDatasetConfig.cols
+
+    def _read_data(self):
+        self.data = pd.read_json(self.path)
+        return self.data
+
+    def _process_sentences(self):
+        self.data["sentence"] = self.data["sentence"].apply(
+            lambda sentence: [word.lower() for word in sentence],
+        )
+
+    def prepare_dataset(self):
+        self._read_data()
+        self._process_sentences()
+        return self.data
+
+    def get_sentences_with_pos_tags(self):
+        if "labels" in self.data.columns:
+            sentences_with_pos_tags = self.data.loc[:, ["sentence", "labels"]].apply(
+                lambda row: list(zip(row["sentence"], row["labels"])), axis=1
+            )
+        else:
+            sentences_with_pos_tags = self.data["sentence"].apply(
+                lambda sentence: list(zip(sentence, [None] * len(sentence)))
+            )
+        sentences_with_pos_tags = sentences_with_pos_tags.tolist()
+        return sentences_with_pos_tags
 
 
 class VocabularyGenerator:
@@ -82,10 +127,8 @@ class VocabularyGenerator:
             pd.DataFrame: A DataFrame with the generated vocabulary.
 
         This method takes a DataFrame with sentences and generates a vocabulary based on word
-        frequencies.
-        It replaces words with frequencies less than the specified threshold with the unknown token
-        ("<unk>").
-        The resulting DataFrame is sorted by frequency and indexed.
+        frequencies. It replaces words with frequencies less than the specified threshold with
+        the unknown token ("<unk>"). The resulting DataFrame is sorted by frequency and indexed.
 
         If the 'save' flag is set, the vocabulary will be saved to the specified path.
 
@@ -97,23 +140,26 @@ class VocabularyGenerator:
         """
         word_freq_df = self._count_word_frequency(data, sentence_col_name)
 
-        # Create a DataFrame
-        # word_freq_df = pd.DataFrame(word_freq_list, columns=["word", "frequency"])
-
         # Replace words with frequency less than threshold with '<unk>'
         word_freq_df["word"] = word_freq_df.apply(
             lambda row: self.unknown_token if row["frequency"] <= self.threshold else row["word"],
             axis=1,
         )
 
-        # # Group by 'Word' and aggregate by sum
+        # Group by 'Word' and aggregate by sum
         word_freq_df = word_freq_df.groupby("word", as_index=False)["frequency"].agg("sum")
 
         # Sort the DataFrame by frequency
         word_freq_df = word_freq_df.sort_values(by="frequency", ascending=False, ignore_index=True)
 
+        # Placing Special Tokens at the top of the DataFrame
+        unk_df = word_freq_df.loc[word_freq_df["word"] == self.unknown_token]
+        word_freq_df = word_freq_df.loc[word_freq_df["word"] != self.unknown_token]
+
+        word_freq_df = pd.concat([unk_df, word_freq_df], ignore_index=True)
+
         # Add an index column
-        word_freq_df["index"] = range(1, len(word_freq_df) + 1)
+        word_freq_df["index"] = range(len(word_freq_df))
 
         if self._save:
             self.save_vocab(word_freq_df, self.path)
@@ -148,6 +194,9 @@ class HMM:
         self.transitions = None
         self.emissions = None
 
+        # Laplace Smoothing
+        self.smoothing_constant = 1e-10
+
     def _read_vocab(self, vocab_file: str):
         return pd.read_csv(vocab_file, sep="\t", names=VocabConfig.FILE_HEADER)
 
@@ -166,51 +215,52 @@ class HMM:
         self.emissions = np.zeros((num_states, num_observations))
 
         # Prior probability matrix of size N * 1
-        self.prior = np.ones(num_states)
+        self.priors = np.zeros(num_states)
+
+    def _smoothen_propabilities(self, prob_mat: np.array, smoothing_constant: float):
+        """Handle cases where the probabilities is 0"""
+        return np.where(prob_mat == 0, smoothing_constant, prob_mat)
 
     def _compute_prior_params(self, train_data):
+        tag_to_index = {tag: i for i, tag in enumerate(self.labels)}
         num_sentences = len(train_data)
 
-        state_occurrence = Counter()
-
         for sentence in train_data:
-            # Ensure the sentence is not empty
-            if sentence:
-                # Get the label of the first word in the sentence
-                label = sentence[0][1]
-                state_occurrence[label] += 1
+            label = sentence[0][1]
+            state_idx = tag_to_index[label]
+            self.priors[state_idx] += 1
 
-        self.priors = np.array([state_occurrence[state] / num_sentences for state in self.labels])
+        self.priors = self.priors / num_sentences
+        self.priors = self._smoothen_propabilities(self.priors, self.smoothing_constant)
 
     def _compute_transition_params(self, train_data):
-        labels_list = [label for sentence in train_data for _, label in sentence]
-        label_indices = [self.states.index(label) for label in labels_list]
+        tag_to_index = {tag: i for i, tag in enumerate(self.labels)}
 
-        for i in range(len(label_indices) - 1):
-            curr_state = label_indices[i]
-            next_state = label_indices[i + 1]
-            self.transitions[curr_state, next_state] += 1
+        for sentence in train_data:
+            label_indices = [tag_to_index.get(label) for _, label in sentence]
 
-        # Handle cases where the probabilities is 0
-        self.transitions = np.where(self.transitions == 0, 1e-10, self.transitions)
+            for i in range(1, len(label_indices)):
+                prev_state = label_indices[i - 1]
+                curr_state = label_indices[i]
+                self.transitions[prev_state, curr_state] += 1
 
-        row_agg = self.transitions.sum(axis=1)
-        self.transitions = self.transitions / row_agg[:, np.newaxis]
+        row_agg = self.transitions.sum(axis=1)[:, np.newaxis]
+        self.transitions = self.transitions / row_agg
+        self.transitions = self._smoothen_propabilities(self.transitions, self.smoothing_constant)
 
     def _compute_emission_params(self, train_data):
         word_to_index = dict(zip(self.vocab["word"], self.vocab["index"]))
+        tag_to_index = {tag: i for i, tag in enumerate(self.labels)}
 
         for sentence in train_data:
             for word, label in sentence:
-                state_idx = self.states.index(label)
-                word_idx = word_to_index.get(word, word_to_index[VocabConfig.UNKNOWN_TOKEN]) - 1
+                state_idx = tag_to_index[label]
+                word_idx = word_to_index.get(word, word_to_index[VocabConfig.UNKNOWN_TOKEN])
                 self.emissions[state_idx, word_idx] += 1
 
-        # Handle cases where the probabilities is 0
-        self.emissions = np.where(self.emissions == 0, 1e-10, self.emissions)
-
-        row_agg = self.emissions.sum(axis=1)
-        self.emissions = self.emissions / row_agg[:, np.newaxis]
+        row_agg = self.emissions.sum(axis=1)[:, np.newaxis]
+        self.emissions = self.emissions / row_agg
+        self.emissions = self._smoothen_propabilities(self.emissions, self.smoothing_constant)
 
     def fit(self, train_data: pd.DataFrame):
         self._initialize_params()
@@ -230,10 +280,8 @@ class HMM:
             os.makedirs(os.path.dirname(file_path))
 
         transition_prob = {
-            f"({s1}, {s2})": p
-            for s1 in self.states
-            for s2 in self.states
-            for p in [self.transitions[self.states.index(s1), self.states.index(s2)]]
+            f"({s1}, {s2})": self.transitions[self.states.index(s1), self.states.index(s2)]
+            for s1, s2 in itertools.product(self.states, repeat=2)
         }
 
         emission_prob = {
@@ -246,3 +294,212 @@ class HMM:
 
         with open(file_path, "w") as json_file:
             json.dump(model_params, json_file, indent=4)
+
+
+class GreedyDecoding:
+    def __init__(self, prior_probs, transition_probs, emission_probs, states, vocab):
+        self.priors = prior_probs
+        self.transitions = transition_probs
+        self.emissions = emission_probs
+        self.states = states
+        self.vocab = vocab
+
+        self.tag_to_idx = {tag: idx for idx, tag in enumerate(states)}
+        self.word_to_index = dict(zip(self.vocab["word"], self.vocab["index"]))
+
+        # Precompute scores for each word-tag pair
+        self.priors_emissions = prior_probs[:, np.newaxis] * emission_probs
+
+    def _decode_single_sentence(self, sentence):
+        predicted_tags = []
+
+        prev_tag_idx = None
+
+        for word in sentence:
+            word_idx = self.word_to_index.get(word, self.word_to_index[VocabConfig.UNKNOWN_TOKEN])
+
+            if prev_tag_idx is None:
+                # scores = self.priors * self.emissions[:, word_idx]
+                scores = self.priors_emissions[:, word_idx]
+            else:
+                scores = self.transitions[prev_tag_idx] * self.emissions[:, word_idx]
+
+            prev_tag_idx = np.argmax(scores)
+            predicted_tags.append(self.states[prev_tag_idx])
+
+        return predicted_tags
+
+    def decode(self, sentences):
+        predicted_tags_list = []
+
+        for sentence in sentences:
+            predicted_tags = self._decode_single_sentence([word for word, tag in sentence])
+            predicted_tags_list.append(predicted_tags)
+
+        return predicted_tags_list
+
+
+class ViterbiDecoding:
+    def __init__(self, prior_probs, transition_probs, emission_probs, states, vocab):
+        self.priors = prior_probs
+        self.transitions = transition_probs
+        self.emissions = emission_probs
+        self.states = states
+        self.vocab = vocab
+
+        self.num_states = len(self.states)
+
+        # Index Conversion dictionary for mapping
+        self.tag_to_idx = {tag: idx for idx, tag in enumerate(states)}
+        self.word_to_idx = dict(zip(self.vocab["word"], self.vocab["index"]))
+
+        # Precompute scores for each word-tag pair
+        self.priors_emissions = prior_probs[:, np.newaxis] * emission_probs
+
+    def _initialize_variables(self, sentence):
+        V = np.zeros((len(sentence), self.num_states))
+        path = np.zeros((len(sentence), self.num_states), dtype=int)
+
+        word_idx = np.array(
+            [
+                self.word_to_idx.get(word, self.word_to_idx[VocabConfig.UNKNOWN_TOKEN])
+                for word in sentence
+            ]
+        )
+
+        return V, path, word_idx
+
+    def _decode_single_sentence(self, sentence):
+        V, path, word_idx = self._initialize_variables(sentence)
+
+        V[0] = np.log(self.priors_emissions[:, word_idx[0]])
+
+        for t in range(1, len(sentence)):
+            # Compute scores
+            scores = (
+                V[t - 1, :, np.newaxis]
+                + np.log(self.transitions)
+                + np.log(self.emissions[:, word_idx[t]])
+            )
+            V[t] = np.max(scores, axis=0)
+            path[t] = np.argmax(scores, axis=0)
+
+        # Backtracking
+        predicted_tags = [0] * len(sentence)
+        predicted_tags[-1] = np.argmax(V[-1])
+
+        for t in range(len(sentence) - 2, -1, -1):
+            predicted_tags[t] = path[t + 1, predicted_tags[t + 1]]
+
+        predicted_tags = [self.states[tag_idx] for tag_idx in predicted_tags]
+        return predicted_tags
+
+    def decode(self, sentences):
+        predicted_tags_list = []
+
+        for sentence in sentences:
+            predicted_tags = self._decode_single_sentence([word for word, tag in sentence])
+            predicted_tags_list.append(predicted_tags)
+
+        return predicted_tags_list
+
+
+def calculate_accuracy(predicted_sequences, true_sequences):
+    """
+    Calculate the accuracy of predicted sequences compared to true sequences.
+
+    Args:
+        predicted_sequences (list): List of predicted sequences.
+        true_sequences (list): List of true sequences.
+
+    Returns:
+        float: Accuracy as a percentage.
+    """
+    total = 0
+    correct = 0
+
+    for true_label, predicted_label in zip(true_sequences, predicted_sequences):
+        for true_tag, predicted_tag in zip(true_label, predicted_label):
+            total += 1
+            if true_tag == predicted_tag:
+                correct += 1
+
+    accuracy = correct / total
+    return accuracy
+
+
+def train_and_evaluate():
+    train_dataset = WSJDataset(path=WSJDatasetConfig.train_file_path)
+    df_train = train_dataset.prepare_dataset()
+
+    valid_dataset = WSJDataset(path=WSJDatasetConfig.dev_file_path)
+    df_valid = valid_dataset.prepare_dataset()
+
+    unp_test_df = WSJDataset(path=WSJDatasetConfig.test_file_path)._read_data()
+
+    test_dataset = WSJDataset(path=WSJDatasetConfig.test_file_path)
+    test_dataset.prepare_dataset()
+
+    vocab_generator = VocabularyGenerator(
+        threshold=VocabConfig.THRESHOLD, unknown_token=VocabConfig.UNKNOWN_TOKEN, save=True
+    )
+    vocab_df = vocab_generator.generate_vocabulary(df_train, "sentence")
+    print("Selected threshold for unknown words: ", VocabConfig.THRESHOLD)
+    print("Vocabulary size: ", vocab_df.shape[0])
+    print(
+        "Total occurrences of the special token <unk>: ",
+        int(vocab_df[vocab_df["word"] == "<unk>"].frequency),
+    )
+
+    unique_pos_tags = df_train.labels.explode().unique()
+    unique_pos_tags = unique_pos_tags.tolist()
+
+    train_sentences_with_pos_tags = train_dataset.get_sentences_with_pos_tags()
+    valid_sentences_with_pos_tags = valid_dataset.get_sentences_with_pos_tags()
+    test_sentences_with_pos_tags = test_dataset.get_sentences_with_pos_tags()
+
+    model = HMM(vocab_file=VocabConfig.VOCAB_FILE, labels=unique_pos_tags)
+    model.fit(train_sentences_with_pos_tags)
+    model.save_model()
+
+    p, t, e = model.get_all_probability_matrices
+    print("Number of Transition Parameters =", len(t.flatten()))
+    print("Number of Emission Parameters =", len(e.flatten()))
+
+    # Assuming you have the probability matrices and other data
+    greedy_decoder = GreedyDecoding(p, t, e, model.states, model.vocab)
+
+    # Apply Greedy Decoding on development data
+    predicted_dev_tags = greedy_decoder.decode(valid_sentences_with_pos_tags)
+
+    # Apply Greedy Decoding on Test data
+    predicted_test_tags = greedy_decoder.decode(test_sentences_with_pos_tags)
+
+    acc = calculate_accuracy(predicted_dev_tags, df_valid.labels.tolist())
+    print("Greedy Decoding Accuracy: ", round(acc, 4))
+
+    df_greedy_preds = unp_test_df.copy(deep=True)
+    df_greedy_preds["labels"] = predicted_test_tags
+
+    df_greedy_preds.to_json(PathConfig.GREEDY_ALGO_OUTPUT_PATH, orient="records", indent=4)
+
+    # Assuming you have the probability matrices and other data
+    viterbi_decoder = ViterbiDecoding(p, t, e, model.states, model.vocab)
+
+    # Apply Greedy Decoding on development data
+    predicted_dev_tags_viterbi = viterbi_decoder.decode(valid_sentences_with_pos_tags)
+
+    acc_v = calculate_accuracy(predicted_dev_tags_viterbi, df_valid.labels.tolist())
+    print("Viterbi Decoding Accuracy: ", round(acc_v, 4))
+
+    # Apply Greedy Decoding on Test data
+    predicted_test_tags_v = greedy_decoder.decode(test_sentences_with_pos_tags)
+
+    df_viterbi_preds = unp_test_df.copy(deep=True)
+    df_viterbi_preds["labels"] = predicted_test_tags_v
+
+    df_viterbi_preds.to_json(PathConfig.VITERBI_ALGO_OUTPUT_PATH, orient="records", indent=4)
+
+
+if __name__ == "__main__":
+    train_and_evaluate()
