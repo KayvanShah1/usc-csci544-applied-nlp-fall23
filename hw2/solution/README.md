@@ -30,7 +30,31 @@ CSCI544_HW2
     python CSCI544_HW2.py
     ```
 
-### Notes
+### Expected Output
+```json
+Reading and preparing data ...
+
+Generating vocabulary ...
+Saved vocabulary to file hw2\solution\output\vocab.txt
+Selected threshold for unknown words:  2
+Vocabulary size:  15568
+Total occurrences of the special token <unk>:  28581
+
+Training the HMM model ...
+Number of Transition Parameters = 2025
+Number of Emission Parameters = 700560
+Saving model to hw2\solution\output\hmm.json
+
+Validating on dev data and producing inference results for test data ...
+
+Greedy Decoding Accuracy:  0.9155
+Saved Greedy Decoding predictions to hw2\solution\output\greedy.json
+
+Viterbi Decoding Accuracy:  0.9323
+Saved Viterbi Decoding predictions to hw2\solution\output\viterbi.json
+```
+
+## Notes
 - Assignment - HW2
 - CSCI554: Applied Natural Language Processing 
 
