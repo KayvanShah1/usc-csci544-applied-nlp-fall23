@@ -12,11 +12,10 @@ import pandas as pd
 
 
 class PathConfig:
-    HW2_DIR = os.path.dirname(os.getcwd())
+    HW2_DIR = os.path.dirname(__file__)
     OUTPUT_DIR = os.path.join(HW2_DIR, "output")
 
     DATA_PATH = os.path.join(HW2_DIR, "data")
-    VERIFICATION_DATA_PATH = os.path.join(HW2_DIR, "CSCI544_HW2", "verification")
 
     VOCAB_FILE_PATH = os.path.join(OUTPUT_DIR, "vocab.txt")
     HMM_MODEL_SAVE_PATH = os.path.join(OUTPUT_DIR, "hmm.json")
@@ -176,6 +175,8 @@ class VocabularyGenerator:
             for word, frequency, index in vocabulary:
                 file.write(f"{word}\t{index}\t{frequency}\n")
 
+        print(f"Saved vocabulary to file {os.path.relpath(path)}")
+
 
 class HMM:
     def __init__(self, vocab_file: str, labels: List[str]):
@@ -306,6 +307,8 @@ class HMM:
 
         with open(file_path, "w") as json_file:
             json.dump(model_params, json_file, indent=4)
+
+        print(f"Saving model to {os.path.relpath(file_path)}")
 
 
 class GreedyDecoding:
@@ -442,6 +445,7 @@ def calculate_accuracy(predicted_sequences, true_sequences):
 
 def train_and_evaluate():
     # Prepare dataset
+    print("\nReading and preparing data ...")
     train_dataset = WSJDataset(path=WSJDatasetConfig.train_file_path)
     df_train = train_dataset.prepare_dataset()
 
@@ -454,6 +458,7 @@ def train_and_evaluate():
     test_dataset.prepare_dataset()
 
     # Generate vocabulary
+    print("\nGenerating vocabulary ...")
     vocab_generator = VocabularyGenerator(
         threshold=VocabConfig.THRESHOLD, unknown_token=VocabConfig.UNKNOWN_TOKEN, save=True
     )
@@ -475,15 +480,19 @@ def train_and_evaluate():
     test_sentences_with_pos_tags = test_dataset.get_sentences_with_pos_tags()
 
     # Initialize, train, and save the model
+    print("\nTraining the HMM model ...")
     model = HMM(vocab_file=VocabConfig.VOCAB_FILE, labels=unique_pos_tags)
     model.fit(train_sentences_with_pos_tags)
-    model.save_model()
 
     # Get all the parameters as probability matrices
     p, t, e = model.get_all_probability_matrices
     print("Number of Transition Parameters =", len(t.flatten()))
     print("Number of Emission Parameters =", len(e.flatten()))
 
+    # Save the model
+    model.save_model()
+
+    print("\nValidating on dev data and producing inference results for test data ...")
     # Assuming you have the probability matrices and other data
     greedy_decoder = GreedyDecoding(p, t, e, model.states, model.vocab)
 
@@ -494,12 +503,16 @@ def train_and_evaluate():
     predicted_test_tags = greedy_decoder.decode(test_sentences_with_pos_tags)
 
     acc = calculate_accuracy(predicted_dev_tags, df_valid.labels.tolist())
-    print("Greedy Decoding Accuracy: ", round(acc, 4))
+    print("\nGreedy Decoding Accuracy: ", round(acc, 4))
 
     df_greedy_preds = unp_test_df.copy(deep=True)
     df_greedy_preds["labels"] = predicted_test_tags
 
     df_greedy_preds.to_json(PathConfig.GREEDY_ALGO_OUTPUT_PATH, orient="records", indent=4)
+    print(
+        "Saved Greedy Decoding predictions to"
+        f" {os.path.relpath(PathConfig.GREEDY_ALGO_OUTPUT_PATH)}"
+    )
 
     # Assuming you have the probability matrices and other data
     viterbi_decoder = ViterbiDecoding(p, t, e, model.states, model.vocab)
@@ -508,7 +521,7 @@ def train_and_evaluate():
     predicted_dev_tags_viterbi = viterbi_decoder.decode(valid_sentences_with_pos_tags)
 
     acc_v = calculate_accuracy(predicted_dev_tags_viterbi, df_valid.labels.tolist())
-    print("Viterbi Decoding Accuracy: ", round(acc_v, 4))
+    print("\nViterbi Decoding Accuracy: ", round(acc_v, 4))
 
     # Apply Greedy Decoding on Test data
     predicted_test_tags_v = greedy_decoder.decode(test_sentences_with_pos_tags)
@@ -517,6 +530,10 @@ def train_and_evaluate():
     df_viterbi_preds["labels"] = predicted_test_tags_v
 
     df_viterbi_preds.to_json(PathConfig.VITERBI_ALGO_OUTPUT_PATH, orient="records", indent=4)
+    print(
+        "Saved Viterbi Decoding predictions to"
+        f" {os.path.relpath(PathConfig.VITERBI_ALGO_OUTPUT_PATH)}"
+    )
 
 
 if __name__ == "__main__":
