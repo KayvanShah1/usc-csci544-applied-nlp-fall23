@@ -3,7 +3,7 @@
 
 ## Directory Tree
 ```
-CSCI544_HW2
+<ROOT DIR>
 ├───output
 |   ├───hmm.json
 |   ├───greedy.json
