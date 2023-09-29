@@ -30,8 +30,12 @@ CSCI544_HW2
     python CSCI544_HW2.py
     ```
 
-
 ### Notes
-> Assignment - HW2
+- Assignment - HW2
+- CSCI554: Applied Natural Language Processing 
 
-> CSCI554: Applied Natural Language Processing 
+## Author
+- Name: `Kayvan Shah`
+- USC ID: `1106650685`
+- Contact: 
+    - Email: `kpshah@usc.edu`
