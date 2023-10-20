@@ -160,10 +160,10 @@ cython_debug/
 #.idea/
 
 # Archives
-.zip
-.gzip
-.gz
-.7z
-.7Z
-.csv
-.tsv
+*.zip
+*.gzip
+*.gz
+*.7z
+*.7Z
+*.csv
+*.tsv
