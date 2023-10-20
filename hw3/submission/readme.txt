@@ -1,0 +1,1 @@
+place the "amazon_reviews_us_Office_Products_v1_00.tsv.gz" at same level as notebook
