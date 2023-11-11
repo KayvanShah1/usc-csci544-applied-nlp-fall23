@@ -25,12 +25,23 @@ To execute the provided Python script, you can follow these steps:
     ```
 
 ### 3. **Check the GloVe Embeddings Loading Section (Task 2):**
-- In the `main` function, verify the loading of the pre-trained model weights.
-- Make sure that you have the saved embeddings file in the specified directory. In your script, the model weights path is defined in `PathConfig.GLOVE_100d_File`. Ensure that this directory exists, and the weights file is present within it.
+- Make sure that you have the saved embeddings file in the specified directory. 
+   ```plaintext
+    submission/
+    |-- embeddings/
+    |-- (Other contents of the project)
+    ```
+- In your script, the model weights path is defined in `PathConfig.GLOVE_100d_File`. Ensure that this directory exists, and the weights file is present within it.
 
 ### 4. **Check the Model Loading Section:**
 - In the `main` function, verify the loading of the pre-trained model weights.
-- Make sure that you have the saved model weights file in the specified directory. In your script, the model weights path is defined in `PathConfig.SAVED_MODELS_DIR`. Ensure that this directory exists, and the weights file is present within it.
+- Make sure that you have the saved model weights file in the specified directory. 
+   ```plaintext
+    submission/
+    |-- saved_models/
+    |-- (Other contents of the project)
+    ```
+- In your script, the model weights path is defined in `PathConfig.SAVED_MODELS_DIR`. Ensure that this directory exists, and the weights file is present within it.
 
 ### 5. **Run the Script:**
    Save the provided script in a file, for example, `main_script.py`. Open a terminal and run the script:
