@@ -8,10 +8,10 @@
 | Homework 2 | `Part-of-Speech (POS) Tagging` on `Wall Street Journal (WSJ) Dataset` using Hidden Markov Models + Greedy and Viterbi Decoding |
 | Homework 3 | `Sentiment Analysis` of `Amazon Reviews Dataset` using Word2Vec Embeddings and Neural Networks |
 | Homework 4 | `Named Entity Recognition (NER)` on `CoNLL-2003` corpus dataset|
+| Paper Presentation | [A Static Evaluation of Code Completion by Large Language Models](paper-presentation/Group37-PaperPresentation.pdf) |
 | --- | --- |
-| Paper Presentation | Landmarks & Category Classification |
-| Project Proposal | Landmarks & Category Classification |
-| Project Presentation | Landmarks & Category Classification |
+| Project Proposal | Leveraging static analysis for evaluating code-generation models |
+| Project Presentation | Leveraging static analysis for evaluating code-generation models |
 | Final Project | [Leveraging static analysis for evaluating code-generation models](https://github.com/ksanu1998/static_analysis_codegen_llms) |
 
 ## Authors
