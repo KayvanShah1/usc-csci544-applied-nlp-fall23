@@ -12,7 +12,7 @@
 | Paper Presentation | Landmarks & Category Classification |
 | Project Proposal | Landmarks & Category Classification |
 | Project Presentation | Landmarks & Category Classification |
-| Final Project |  |
+| Final Project | [Leveraging static analysis for evaluating code-generation models](https://github.com/ksanu1998/static_analysis_codegen_llms) |
 
 ## Authors
 1. [Kayvan Shah](https://github.com/KayvanShah1) | `MS in Applied Data Science` | `USC`
