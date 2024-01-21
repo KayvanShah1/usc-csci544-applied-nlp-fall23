@@ -1,7 +1,7 @@
 # CSCI544 - Applied Natural Language Processing - Fall 23 - USC
 Welcome to the comprehensive repository for _CSCI 544 - Applied Natural Language Processing_ at USC during the __Fall 2023__ semester, taught by `Professor Mohammad Rostami`. This centralized hub contains all coursework materials, including assignments and project solutions, organized into folders representing distinct modules covered in the course.
 
-Within this repository, you'll find assignments and projects that delve into machine learning and deep learning algorithms applied to real-world datasets. It's important to use this repository responsibly, refraining from engaging in any activities associated with plagiarism.
+Within this repository, you'll find assignments, quizzes, and projects-related materials and solutions that delve into machine learning and deep learning algorithms applied to real-world datasets. It's important to use this repository responsibly, refraining from engaging in plagiarism-related activities.
 
 > [!TIP]
 > Before exploring the materials, take a moment to review the license and disclaimer for responsible utilization. The repository covers various topics, providing valuable insights and hands-on experience in Natural Language Processing.
@@ -30,6 +30,7 @@ Feel free to explore the assignments, projects, and solutions provided as learni
 | Homework 2 | `Part-of-Speech (POS) Tagging` on `Wall Street Journal (WSJ) Dataset` using Hidden Markov Models + Greedy and Viterbi Decoding |
 | Homework 3 | `Sentiment Analysis` of `Amazon Reviews Dataset` using Word2Vec Embeddings and Neural Networks |
 | Homework 4 | `Named Entity Recognition (NER)` on `CoNLL-2003` corpus dataset|
+| Quizzes | Solutions for quizzes + midterm + final exam |
 | Paper Presentation | [A Static Evaluation of Code Completion by Large Language Models](paper-presentation/Group37-PaperPresentation.pdf) |
 | --- | --- |
 | Project Proposal | Leveraging static analysis for evaluating code-generation models |
