@@ -1,5 +1,27 @@
-# CSCI544 - Applied Natural Language Processing
+# CSCI544 - Applied Natural Language Processing - Fall 23 - USC
+Welcome to the comprehensive repository for _CSCI 544 - Applied Natural Language Processing_ at USC during the __Fall 2023__ semester, taught by `Professor Mohammad Rostami`. This centralized hub contains all coursework materials, including assignments and project solutions, organized into folders representing distinct modules covered in the course.
 
+Within this repository, you'll find assignments and projects that delve into machine learning and deep learning algorithms applied to real-world datasets. It's important to use this repository responsibly, refraining from engaging in any activities associated with plagiarism.
+
+> [!TIP]
+> Before exploring the materials, take a moment to review the license and disclaimer for responsible utilization. The repository covers various topics, providing valuable insights and hands-on experience in Natural Language Processing.
+
+## Course Details:
+- **Course Name:** CSCI 544 - Applied Natural Language Processing
+- **Instructor:** Professor Mohammed Rostami
+- **Semester:** Fall 2023
+- **Focus Areas:**
+  - Sentiment Analysis on the Amazon Reviews Dataset using Classical ML models (Homework 1)
+  - Part-of-Speech (POS) Tagging on the Wall Street Journal (WSJ) Dataset using Hidden Markov Models + Greedy and Viterbi Decoding (Homework 2)
+  - Sentiment Analysis of Amazon Reviews Dataset using Word2Vec Embeddings and Neural Networks (Homework 3)
+  - Named Entity Recognition (NER) on CoNLL-2003 corpus dataset (Homework 4)
+  - Paper Presentation on "A Static Evaluation of Code Completion by Large Language Models"
+  - Project Proposal, Presentation, and Final Project on "Leveraging static analysis for evaluating code-generation models"
+
+Feel free to explore the assignments, projects, and solutions provided as learning aids. Whether you're a beginner or an experienced practitioner, this repository aims to be your companion in mastering the intersection of machine learning and data science within Natural Language Processing. Happy learning!
+
+> [!CAUTION]
+> Please note that this repository serves as a reference guide and should be utilized as a tool for learning and comprehension. It's paramount to refrain from engaging in any activities associated with plagiarism. Embrace the wealth of knowledge herein to enhance your understanding and augment your skill set in the field of machine learning.
 
 ## Table of contents
 | Assignment | Topic Covered                 |
