@@ -36,6 +36,9 @@ Feel free to explore the assignments, projects, and solutions provided as learni
 | --- | --- |
 | [Final Project](https://github.com/ksanu1998/static_analysis_codegen_llms) | Leveraging static analysis for evaluating code-generation models (Project Proposal + Presentation + Source Code) |
 
+> [!NOTE]
+> Overall Grade: `A`
+
 ## Authors
 1. [Kayvan Shah](https://github.com/KayvanShah1) | `MS in Applied Data Science` | `USC`
 
