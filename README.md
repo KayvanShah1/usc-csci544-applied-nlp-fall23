@@ -24,18 +24,17 @@ Feel free to explore the assignments, projects, and solutions provided as learni
 > Please note that this repository serves as a reference guide and should be utilized as a tool for learning and comprehension. It's paramount to refrain from engaging in any activities associated with plagiarism. Embrace the wealth of knowledge herein to enhance your understanding and augment your skill set in the field of machine learning.
 
 ## Table of contents
-| Assignment | Topic Covered                 |
-|------------|-------------------------------|
-| Homework 1 | `Sentiment Analysis` on `Amazon Reviews Dataset` using Classical ML models |
-| Homework 2 | `Part-of-Speech (POS) Tagging` on `Wall Street Journal (WSJ) Dataset` using Hidden Markov Models + Greedy and Viterbi Decoding |
-| Homework 3 | `Sentiment Analysis` of `Amazon Reviews Dataset` using Word2Vec Embeddings and Neural Networks |
-| Homework 4 | `Named Entity Recognition (NER)` on `CoNLL-2003` corpus dataset|
-| Quizzes | Solutions for quizzes + midterm + final exam |
-| Paper Presentation | [A Static Evaluation of Code Completion by Large Language Models](paper-presentation/Group37-PaperPresentation.pdf) |
+| Assignment | Topic Covered                 | Grade |
+|------------|-------------------------------| ----- |
+| [Homework 1](/hw1/) | `Sentiment Analysis` on `Amazon Reviews Dataset` using Classical ML models | 100/100 |
+| [Homework 2](/hw2/) | `Part-of-Speech (POS) Tagging` on `Wall Street Journal (WSJ) Dataset` using Hidden Markov Models + Greedy and Viterbi Decoding | 100/100 |
+| [Homework 3](/hw3/) | `Sentiment Analysis` of `Amazon Reviews Dataset` using Word2Vec Embeddings and Neural Networks | 100/100 |
+| [Homework 4](/hw4/) | `Named Entity Recognition (NER)` on `CoNLL-2003` corpus dataset| 100/100 |
 | --- | --- |
-| Project Proposal | Leveraging static analysis for evaluating code-generation models |
-| Project Presentation | Leveraging static analysis for evaluating code-generation models |
-| Final Project | [Leveraging static analysis for evaluating code-generation models](https://github.com/ksanu1998/static_analysis_codegen_llms) |
+| [Quizzes](/quizzes/) | Solutions for quizzes + midterm + final exam |
+| [Paper Presentation](paper-presentation/Group37-PaperPresentation.pdf) | A Static Evaluation of Code Completion by Large Language Models |
+| --- | --- |
+| [Final Project](https://github.com/ksanu1998/static_analysis_codegen_llms) | Leveraging static analysis for evaluating code-generation models (Project Proposal + Presentation + Source Code) |
 
 ## Authors
 1. [Kayvan Shah](https://github.com/KayvanShah1) | `MS in Applied Data Science` | `USC`
